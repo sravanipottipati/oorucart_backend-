@@ -13,7 +13,6 @@ class PlaceOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # Only buyers can place orders
         if request.user.user_type != 'buyer':
             return Response(
                 {'error': 'Only buyers can place orders'},
@@ -26,7 +25,6 @@ class PlaceOrderView(APIView):
 
         data = serializer.validated_data
 
-        # Get vendor
         try:
             vendor = Vendor.objects.get(id=data['vendor_id'], status='approved')
         except Vendor.DoesNotExist:
@@ -35,7 +33,6 @@ class PlaceOrderView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # Calculate total
         total_amount = 0
         order_items = []
 
@@ -60,7 +57,6 @@ class PlaceOrderView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-        # Create order
         order = Order.objects.create(
             buyer=request.user,
             vendor=vendor,
@@ -72,7 +68,6 @@ class PlaceOrderView(APIView):
             status='placed'
         )
 
-        # Create order items
         for item in order_items:
             OrderItem.objects.create(
                 order=order,
@@ -157,18 +152,14 @@ class UpdateOrderStatusView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Deduct platform fee when order is accepted
+            # Record fee as pending when order is accepted — no wallet deduction
             if new_status == 'accepted' and order.status == 'placed':
-                vendor = order.vendor
-                vendor.wallet_balance -= order.platform_fee
-                vendor.save()
-
-                # Record wallet transaction
                 WalletTransaction.objects.create(
-                    vendor=vendor,
+                    vendor=order.vendor,
                     order=order,
                     amount=order.platform_fee,
                     transaction_type='debit',
+                    status='pending',
                     description=f'Platform fee for order {order.id}'
                 )
 
@@ -210,7 +201,6 @@ class OrderDetailView(APIView):
         except Order.DoesNotExist:
             return Response({'error': 'Order not found'}, status=404)
 
-        # Only buyer or vendor of this order can see it
         user = request.user
         if order.buyer != user and (
             not hasattr(user, 'vendor') or order.vendor != user.vendor
