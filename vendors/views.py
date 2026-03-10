@@ -11,13 +11,11 @@ class VendorRegisterView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # Check if vendor already exists
         if hasattr(request.user, 'vendor'):
             return Response(
                 {'error': 'You already have a shop registered'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        # Check user is a vendor type
         if request.user.user_type != 'vendor':
             return Response(
                 {'error': 'Only vendor accounts can register a shop'},
@@ -42,14 +40,11 @@ class NearbyShopsView(APIView):
     def get(self, request):
         town = request.query_params.get('town', '')
         category = request.query_params.get('category', '')
-
         shops = Vendor.objects.filter(status='approved', is_open=True)
-
         if town:
             shops = shops.filter(town__icontains=town)
         if category:
             shops = shops.filter(category=category)
-
         serializer = VendorSerializer(shops, many=True)
         return Response({
             'count': shops.count(),
@@ -120,9 +115,25 @@ class MyShopView(APIView):
         try:
             vendor = request.user.vendor
             serializer = VendorSerializer(vendor)
-            return Response(serializer.data)
+            return Response({'vendor': serializer.data})
         except Exception:
             return Response(
                 {'error': 'You do not have a shop yet'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+
+class ToggleShopView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            vendor = Vendor.objects.get(user=request.user)
+            vendor.is_open = not vendor.is_open
+            vendor.save()
+            return Response({
+                'is_open': vendor.is_open,
+                'message': 'Shop is now Open!' if vendor.is_open else 'Shop is now Closed!'
+            })
+        except Vendor.DoesNotExist:
+            return Response({'error': 'Vendor not found'}, status=404)
