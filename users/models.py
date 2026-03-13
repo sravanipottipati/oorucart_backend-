@@ -33,6 +33,7 @@ class User(AbstractBaseUser):
     is_admin     = models.BooleanField(default=False)
     is_staff     = models.BooleanField(default=False)
     fcm_token    = models.TextField(blank=True, null=True)
+    town         = models.CharField(max_length=100, blank=True, null=True)
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
 

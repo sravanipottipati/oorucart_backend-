@@ -54,6 +54,19 @@ class ProfileView(APIView):
             return Response({'error': 'Not authenticated'}, status=401)
         return Response(UserSerializer(request.user).data)
 
+    def patch(self, request):
+        if not request.user.is_authenticated:
+            return Response({'error': 'Not authenticated'}, status=401)
+        user = request.user
+        user.full_name = request.data.get('full_name', user.full_name)
+        user.email     = request.data.get('email', user.email)
+        user.town      = request.data.get('town', user.town)
+        user.save()
+        return Response({
+            'message': 'Profile updated successfully',
+            'user':    UserSerializer(user).data,
+        })
+
 
 # ─── ADDRESS VIEWS ────────────────────────────────────────────────────────────
 
@@ -84,7 +97,6 @@ class AddressListView(APIView):
         if not town:
             return Response({'error': 'Town is required'}, status=400)
 
-        # If first address, make it default
         if not Address.objects.filter(user=request.user).exists():
             is_default = True
 
@@ -124,14 +136,12 @@ class AddressDetailView(APIView):
         address.pincode      = request.data.get('pincode', address.pincode)
         address.is_default   = request.data.get('is_default', address.is_default)
         address.save()
-
         return Response({'message': 'Address updated successfully'})
 
     def delete(self, request, address_id):
         try:
             address = Address.objects.get(id=address_id, user=request.user)
             address.delete()
-            # If deleted address was default, make first remaining default
             remaining = Address.objects.filter(user=request.user).first()
             if remaining:
                 remaining.is_default = True
