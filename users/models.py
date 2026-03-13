@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 import uuid
 
+
 class UserManager(BaseUserManager):
     def create_user(self, phone_number, password=None, **extra_fields):
         if not phone_number:
@@ -19,26 +20,25 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser):
     USER_TYPES = (
-        ('buyer', 'Buyer'),
+        ('buyer',  'Buyer'),
         ('vendor', 'Vendor'),
-        ('admin', 'Admin'),
+        ('admin',  'Admin'),
     )
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    full_name = models.CharField(max_length=100)
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    full_name    = models.CharField(max_length=100)
     phone_number = models.CharField(max_length=10, unique=True)
-    email = models.EmailField(blank=True, null=True)
-    user_type = models.CharField(max_length=10, choices=USER_TYPES, default='buyer')
-    is_active = models.BooleanField(default=True)
-    is_admin = models.BooleanField(default=False)
-    is_staff = models.BooleanField(default=False)
-    fcm_token = models.TextField(blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    email        = models.EmailField(blank=True, null=True)
+    user_type    = models.CharField(max_length=10, choices=USER_TYPES, default='buyer')
+    is_active    = models.BooleanField(default=True)
+    is_admin     = models.BooleanField(default=False)
+    is_staff     = models.BooleanField(default=False)
+    fcm_token    = models.TextField(blank=True, null=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
 
     objects = UserManager()
 
-    USERNAME_FIELD = 'phone_number'
+    USERNAME_FIELD  = 'phone_number'
     REQUIRED_FIELDS = ['full_name']
 
     def __str__(self):
@@ -49,3 +49,29 @@ class User(AbstractBaseUser):
 
     def has_module_perms(self, app_label):
         return True
+
+
+class Address(models.Model):
+    LABEL_CHOICES = (
+        ('Home',  'Home'),
+        ('Work',  'Work'),
+        ('Other', 'Other'),
+    )
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user         = models.ForeignKey(User, on_delete=models.CASCADE, related_name='addresses')
+    label        = models.CharField(max_length=50, choices=LABEL_CHOICES, default='Home')
+    full_address = models.TextField()
+    town         = models.CharField(max_length=100)
+    pincode      = models.CharField(max_length=10, blank=True, null=True)
+    is_default   = models.BooleanField(default=False)
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            Address.objects.filter(
+                user=self.user, is_default=True
+            ).exclude(id=self.id).update(is_default=False)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.user.full_name} - {self.label} - {self.town}"

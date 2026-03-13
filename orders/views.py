@@ -2,11 +2,24 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from .models import Order, OrderItem
+from .models import Order, OrderItem, Notification
 from .serializers import PlaceOrderSerializer, OrderSerializer
 from vendors.models import Vendor, Product
 from wallet.models import WalletTransaction
 from django.utils import timezone
+
+
+def create_notification(user, notif_type, title, message, order=None):
+    try:
+        Notification.objects.create(
+            user=user,
+            type=notif_type,
+            title=title,
+            message=message,
+            order=order,
+        )
+    except Exception as e:
+        print(f"Notification error: {e}")
 
 
 class PlaceOrderView(APIView):
@@ -18,13 +31,11 @@ class PlaceOrderView(APIView):
                 {'error': 'Only buyers can place orders'},
                 status=status.HTTP_403_FORBIDDEN
             )
-
         serializer = PlaceOrderSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         data = serializer.validated_data
-
         try:
             vendor = Vendor.objects.get(id=data['vendor_id'], status='approved')
         except Vendor.DoesNotExist:
@@ -34,23 +45,16 @@ class PlaceOrderView(APIView):
             )
 
         total_amount = 0
-        order_items = []
-
+        order_items  = []
         for item in data['items']:
             try:
-                product = Product.objects.get(
-                    id=item['product_id'],
-                    vendor=vendor,
-                    is_available=True
+                product  = Product.objects.get(
+                    id=item['product_id'], vendor=vendor, is_available=True
                 )
                 quantity = int(item['quantity'])
-                price = product.price
+                price    = product.price
                 total_amount += price * quantity
-                order_items.append({
-                    'product': product,
-                    'quantity': quantity,
-                    'price': price
-                })
+                order_items.append({'product': product, 'quantity': quantity, 'price': price})
             except Product.DoesNotExist:
                 return Response(
                     {'error': f"Product {item['product_id']} not found"},
@@ -67,7 +71,6 @@ class PlaceOrderView(APIView):
             payment_mode=data.get('payment_mode', 'cod'),
             status='placed'
         )
-
         for item in order_items:
             OrderItem.objects.create(
                 order=order,
@@ -75,6 +78,23 @@ class PlaceOrderView(APIView):
                 quantity=item['quantity'],
                 price=item['price']
             )
+
+        # Notify vendor about new order
+        create_notification(
+            user=vendor.user,
+            notif_type='new_order',
+            title='New Order Received',
+            message=f'Order #{str(order.id)[:8].upper()} received for ₹{order.total_amount}',
+            order=order,
+        )
+        # Notify buyer order placed
+        create_notification(
+            user=request.user,
+            notif_type='order_placed',
+            title='Order Placed Successfully',
+            message=f'Your order from {vendor.shop_name} has been placed!',
+            order=order,
+        )
 
         return Response({
             'message': 'Order placed successfully!',
@@ -86,14 +106,9 @@ class BuyerOrdersView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        orders = Order.objects.filter(
-            buyer=request.user
-        ).order_by('-created_at')
+        orders     = Order.objects.filter(buyer=request.user).order_by('-created_at')
         serializer = OrderSerializer(orders, many=True)
-        return Response({
-            'count': orders.count(),
-            'orders': serializer.data
-        })
+        return Response({'count': orders.count(), 'orders': serializer.data})
 
 
 class VendorOrdersView(APIView):
@@ -103,18 +118,10 @@ class VendorOrdersView(APIView):
         try:
             vendor = request.user.vendor
         except Exception:
-            return Response(
-                {'error': 'You do not have a shop'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        orders = Order.objects.filter(
-            vendor=vendor
-        ).order_by('-created_at')
+            return Response({'error': 'You do not have a shop'}, status=400)
+        orders     = Order.objects.filter(vendor=vendor).order_by('-created_at')
         serializer = OrderSerializer(orders, many=True)
-        return Response({
-            'count': orders.count(),
-            'orders': serializer.data
-        })
+        return Response({'count': orders.count(), 'orders': serializer.data})
 
 
 class UpdateOrderStatusView(APIView):
@@ -124,13 +131,10 @@ class UpdateOrderStatusView(APIView):
         try:
             order = Order.objects.get(id=order_id)
         except Order.DoesNotExist:
-            return Response(
-                {'error': 'Order not found'},
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response({'error': 'Order not found'}, status=404)
 
         new_status = request.data.get('status')
-        user = request.user
+        user       = request.user
 
         # Vendor actions
         if user.user_type == 'vendor':
@@ -138,21 +142,14 @@ class UpdateOrderStatusView(APIView):
                 vendor = user.vendor
             except Exception:
                 return Response({'error': 'Not a vendor'}, status=400)
-
             if order.vendor != vendor:
-                return Response(
-                    {'error': 'This is not your order'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
+                return Response({'error': 'This is not your order'}, status=403)
 
             allowed = ['accepted', 'rejected', 'preparing', 'dispatched', 'delivered']
             if new_status not in allowed:
-                return Response(
-                    {'error': f'Invalid status. Choose from: {allowed}'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({'error': f'Invalid status. Choose from: {allowed}'}, status=400)
 
-            # Record fee as pending when order is accepted — no wallet deduction
+            # Record platform fee when accepted
             if new_status == 'accepted' and order.status == 'placed':
                 WalletTransaction.objects.create(
                     vendor=order.vendor,
@@ -166,28 +163,51 @@ class UpdateOrderStatusView(APIView):
             order.status = new_status
             order.save()
 
+            # Notify buyer of status change
+            STATUS_MESSAGES = {
+                'accepted':   ('Order Accepted ✅',   f'{vendor.shop_name} accepted your order!'),
+                'rejected':   ('Order Rejected ❌',   f'{vendor.shop_name} rejected your order.'),
+                'preparing':  ('Being Prepared ��‍🍳',  f'{vendor.shop_name} is preparing your order.'),
+                'dispatched': ('Out for Delivery 🛵', 'Your order is on the way!'),
+                'delivered':  ('Order Delivered 🎉',  'Your order has been delivered. Enjoy!'),
+            }
+            if new_status in STATUS_MESSAGES:
+                title, message = STATUS_MESSAGES[new_status]
+                create_notification(
+                    user=order.buyer,
+                    notif_type=f'order_{new_status}',
+                    title=title,
+                    message=message,
+                    order=order,
+                )
+
             return Response({
                 'message': f'Order status updated to {new_status}',
-                'order': OrderSerializer(order).data
+                'order':   OrderSerializer(order).data
             })
 
-        # Buyer can only cancel
+        # Buyer cancel
         elif user.user_type == 'buyer':
             if order.buyer != user:
                 return Response({'error': 'Not your order'}, status=403)
             if new_status != 'cancelled':
                 return Response({'error': 'Buyers can only cancel orders'}, status=400)
             if order.status not in ['placed']:
-                return Response(
-                    {'error': 'Can only cancel orders that are just placed'},
-                    status=400
-                )
+                return Response({'error': 'Can only cancel orders that are just placed'}, status=400)
+
             order.status = 'cancelled'
             order.save()
-            return Response({
-                'message': 'Order cancelled',
-                'order': OrderSerializer(order).data
-            })
+
+            # Notify vendor of cancellation
+            create_notification(
+                user=order.vendor.user,
+                notif_type='order_cancelled',
+                title='Order Cancelled ❌',
+                message=f'Order #{str(order.id)[:8].upper()} was cancelled by customer.',
+                order=order,
+            )
+
+            return Response({'message': 'Order cancelled', 'order': OrderSerializer(order).data})
 
         return Response({'error': 'Unauthorized'}, status=403)
 
@@ -206,5 +226,39 @@ class OrderDetailView(APIView):
             not hasattr(user, 'vendor') or order.vendor != user.vendor
         ):
             return Response({'error': 'Unauthorized'}, status=403)
-
         return Response(OrderSerializer(order).data)
+
+
+# ─── NOTIFICATION VIEWS ───────────────────────────────────────────────────────
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        notifications = Notification.objects.filter(user=request.user)[:50]
+        data = [{
+            'id':         str(n.id),
+            'type':       n.type,
+            'title':      n.title,
+            'message':    n.message,
+            'is_read':    n.is_read,
+            'order_id':   str(n.order.id) if n.order else None,
+            'created_at': n.created_at.isoformat(),
+        } for n in notifications]
+        return Response({
+            'count':    len(data),
+            'unread':   sum(1 for n in data if not n['is_read']),
+            'notifications': data,
+        })
+
+
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, notif_id=None):
+        if notif_id:
+            Notification.objects.filter(id=notif_id, user=request.user).update(is_read=True)
+        else:
+            # Mark all read
+            Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return Response({'message': 'Marked as read'})
