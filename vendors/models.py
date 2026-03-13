@@ -35,7 +35,7 @@ class Vendor(models.Model):
     rating                  = models.FloatField(default=0.0)
     total_reviews           = models.IntegerField(default=0)
     is_open                 = models.BooleanField(default=True)
-    status                  = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    status                  = models.CharField(max_length=10, choices=STATUS_CHOICES, default='approved')
     created_at              = models.DateTimeField(auto_now_add=True)
     updated_at              = models.DateTimeField(auto_now=True)
 
