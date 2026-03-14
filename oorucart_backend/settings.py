@@ -20,7 +20,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    # OoruCart apps
+    # Shop2me apps
     'users',
     'vendors',
     'orders',

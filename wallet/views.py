@@ -49,7 +49,7 @@ class WalletSummaryView(APIView):
             'pending_fees': pending_fees,
             'settled_fees': settled_fees,
             'total_orders_delivered': total_orders,
-            'message': f'You owe ₹{pending_fees} to OoruCart (pending settlement)'
+            'message': f'You owe ₹{pending_fees} to Shop2me (pending settlement)'
         })
 
 
