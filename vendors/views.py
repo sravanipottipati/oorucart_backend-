@@ -5,6 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Vendor, Product, Wishlist
 from .serializers import (VendorSerializer, VendorRegisterSerializer,
                           ProductSerializer, AddProductSerializer)
+import math
 
 
 class VendorRegisterView(APIView):
@@ -28,8 +29,8 @@ class VendorRegisterView(APIView):
         if serializer.is_valid():
             vendor = serializer.save()
             return Response({
-                'message': 'Shop registered successfully! Waiting for admin approval.',
-                'vendor':  VendorSerializer(vendor).data
+                'message': 'Shop registered successfully!',
+                'vendor':  VendorSerializer(vendor, context={'request': request}).data
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -38,16 +39,48 @@ class NearbyShopsView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        town     = request.query_params.get('town', '')
-        category = request.query_params.get('category', '')
-        shops    = Vendor.objects.filter(status='approved', is_open=True)
+        town      = request.query_params.get('town', '')
+        category  = request.query_params.get('category', '')
+        buyer_lat = request.query_params.get('lat', None)
+        buyer_lng = request.query_params.get('lng', None)
+
+        shops = Vendor.objects.filter(status='approved', is_open=True)
         if town:
             shops = shops.filter(town__icontains=town)
         if category:
             shops = shops.filter(category=category)
-        serializer = VendorSerializer(shops, many=True)
+
+        shops = list(shops)
+
+        # Filter by 5km radius if buyer GPS provided
+        if buyer_lat and buyer_lng:
+            try:
+                blat = float(buyer_lat)
+                blng = float(buyer_lng)
+
+                def in_radius(v):
+                    if not v.latitude or not v.longitude:
+                        return True
+                    R    = 6371
+                    dlat = math.radians(v.latitude - blat)
+                    dlon = math.radians(v.longitude - blng)
+                    a    = (math.sin(dlat/2)**2 +
+                            math.cos(math.radians(blat)) *
+                            math.cos(math.radians(v.latitude)) *
+                            math.sin(dlon/2)**2)
+                    dist = R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+                    return dist <= 5.0
+
+                shops = [s for s in shops if in_radius(s)]
+            except (ValueError, TypeError):
+                pass
+
+        serializer = VendorSerializer(
+            shops, many=True,
+            context={'request': request}
+        )
         return Response({
-            'count': shops.count(),
+            'count': len(shops),
             'shops': serializer.data
         })
 
@@ -58,7 +91,7 @@ class ShopDetailView(APIView):
     def get(self, request, vendor_id):
         try:
             vendor     = Vendor.objects.get(id=vendor_id, status='approved')
-            serializer = VendorSerializer(vendor)
+            serializer = VendorSerializer(vendor, context={'request': request})
             return Response(serializer.data)
         except Vendor.DoesNotExist:
             return Response(
@@ -114,7 +147,7 @@ class MyShopView(APIView):
     def get(self, request):
         try:
             vendor     = request.user.vendor
-            serializer = VendorSerializer(vendor)
+            serializer = VendorSerializer(vendor, context={'request': request})
             return Response(serializer.data)
         except Exception:
             return Response(
@@ -179,7 +212,7 @@ class SearchView(APIView):
         if town:
             shops = shops.filter(town__icontains=town)
         shops     = shops.filter(shop_name__icontains=q)
-        shop_data = VendorSerializer(shops, many=True).data
+        shop_data = VendorSerializer(shops, many=True, context={'request': request}).data
 
         products = Product.objects.filter(is_available=True)
         if town:

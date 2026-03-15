@@ -39,13 +39,19 @@ class VendorSerializer(serializers.ModelSerializer):
         if not request:
             return None
         try:
-            buyer_lat = float(request.query_params.get('lat', 0))
-            buyer_lng = float(request.query_params.get('lng', 0))
-            if buyer_lat and buyer_lng and obj.latitude and obj.longitude:
-                return calculate_distance(buyer_lat, buyer_lng, obj.latitude, obj.longitude)
-        except (ValueError, TypeError):
-            pass
-        return None
+            lat_str = request.query_params.get('lat')
+            lng_str = request.query_params.get('lng')
+            if not lat_str or not lng_str:
+                return None
+            buyer_lat = float(lat_str)
+            buyer_lng = float(lng_str)
+            if not obj.latitude or not obj.longitude:
+                return None
+            dist = calculate_distance(buyer_lat, buyer_lng, obj.latitude, obj.longitude)
+            return dist
+        except (ValueError, TypeError) as e:
+            print(f"Distance error: {e}")
+            return None
 
 class VendorRegisterSerializer(serializers.ModelSerializer):
     class Meta:
