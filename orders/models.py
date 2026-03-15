@@ -71,3 +71,26 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name} - {self.title}"
+
+
+class Review(models.Model):
+    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order      = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='review')
+    buyer      = models.ForeignKey('users.User', on_delete=models.CASCADE, related_name='reviews')
+    vendor     = models.ForeignKey('vendors.Vendor', on_delete=models.CASCADE, related_name='reviews')
+    rating     = models.IntegerField(default=5)
+    comment    = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Update vendor average rating
+        from django.db.models import Avg
+        avg = Review.objects.filter(vendor=self.vendor).aggregate(Avg('rating'))['rating__avg']
+        count = Review.objects.filter(vendor=self.vendor).count()
+        self.vendor.rating = round(avg, 1)
+        self.vendor.total_reviews = count
+        self.vendor.save()
+
+    def __str__(self):
+        return f"{self.buyer.full_name} → {self.vendor.shop_name} ({self.rating}★)"

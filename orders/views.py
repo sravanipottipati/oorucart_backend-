@@ -262,3 +262,46 @@ class MarkNotificationReadView(APIView):
             # Mark all read
             Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({'message': 'Marked as read'})
+
+
+class SubmitReviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id, buyer=request.user)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=404)
+
+        if order.status != 'delivered':
+            return Response({'error': 'Can only review delivered orders'}, status=400)
+
+        if hasattr(order, 'review'):
+            return Response({'error': 'Already reviewed'}, status=400)
+
+        rating  = request.data.get('rating', 5)
+        comment = request.data.get('comment', '')
+
+        from .models import Review
+        review = Review.objects.create(
+            order=order, buyer=request.user,
+            vendor=order.vendor, rating=rating, comment=comment,
+        )
+        return Response({
+            'message': 'Review submitted successfully!',
+            'rating':  review.rating,
+            'comment': review.comment,
+        }, status=201)
+
+    def get(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id, buyer=request.user)
+            if hasattr(order, 'review'):
+                return Response({
+                    'has_review': True,
+                    'rating':     order.review.rating,
+                    'comment':    order.review.comment,
+                })
+            return Response({'has_review': False})
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found'}, status=404)
