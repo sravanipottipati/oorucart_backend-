@@ -2,7 +2,6 @@ from django.db import models
 from users.models import User
 import uuid
 
-
 class Vendor(models.Model):
     CATEGORY_CHOICES = (
         ('vegetables',  'Vegetables'),
@@ -28,6 +27,8 @@ class Vendor(models.Model):
     phone_number            = models.CharField(max_length=10)
     address                 = models.TextField()
     town                    = models.CharField(max_length=100)
+    latitude                = models.FloatField(null=True, blank=True)
+    longitude               = models.FloatField(null=True, blank=True)
     delivery_type           = models.CharField(max_length=10, choices=DELIVERY_CHOICES, default='both')
     estimated_delivery_time = models.IntegerField(default=30)
     platform_fee            = models.DecimalField(max_digits=6, decimal_places=2, default=0)
@@ -41,7 +42,6 @@ class Vendor(models.Model):
 
     def __str__(self):
         return f"{self.shop_name} ({self.town})"
-
 
 class Product(models.Model):
     CATEGORY_CHOICES = (
@@ -67,7 +67,6 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.vendor.shop_name}"
-
 
 class Wishlist(models.Model):
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
