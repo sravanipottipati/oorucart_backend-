@@ -52,7 +52,6 @@ class NearbyShopsView(APIView):
 
         shops = list(shops)
 
-        # Filter by 5km radius if buyer GPS provided
         if buyer_lat and buyer_lng:
             try:
                 blat = float(buyer_lat)
@@ -198,40 +197,84 @@ class EditProductView(APIView):
             return Response({'error': 'Product not found'}, status=404)
 
 
+# ─── SEARCH WITH FILTERS + SORT ───────────────────────────────────────────────
+
 class SearchView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        q    = request.query_params.get('q', '').strip()
-        town = request.query_params.get('town', '').strip()
+        q         = request.query_params.get('q', '').strip()
+        town      = request.query_params.get('town', '').strip()
+        min_price = request.query_params.get('min_price', None)
+        max_price = request.query_params.get('max_price', None)
+        sort_by   = request.query_params.get('sort_by', 'relevant')
+        # sort_by: relevant | price_low | price_high | rating | name
 
         if not q:
             return Response({'shops': [], 'products': []})
 
+        # ── Shops ──────────────────────────────────────────────────────────────
         shops = Vendor.objects.filter(status='approved', is_open=True)
         if town:
             shops = shops.filter(town__icontains=town)
-        shops     = shops.filter(shop_name__icontains=q)
-        shop_data = VendorSerializer(shops, many=True, context={'request': request}).data
+        shops = shops.filter(shop_name__icontains=q)
+        if sort_by == 'rating':
+            shops = shops.order_by('-rating')
+        elif sort_by == 'name':
+            shops = shops.order_by('shop_name')
+        else:
+            shops = shops.order_by('-rating')
 
+        shop_data = VendorSerializer(
+            shops, many=True, context={'request': request}
+        ).data
+
+        # ── Products ───────────────────────────────────────────────────────────
         products = Product.objects.filter(is_available=True)
         if town:
             products = products.filter(vendor__town__icontains=town)
         products = products.filter(name__icontains=q)
 
+        # Price filter
+        if min_price:
+            try:
+                products = products.filter(price__gte=float(min_price))
+            except ValueError:
+                pass
+        if max_price:
+            try:
+                products = products.filter(price__lte=float(max_price))
+            except ValueError:
+                pass
+
+        # Sort products
+        if sort_by == 'price_low':
+            products = products.order_by('price')
+        elif sort_by == 'price_high':
+            products = products.order_by('-price')
+        elif sort_by == 'rating':
+            products = products.order_by('-vendor__rating')
+        elif sort_by == 'name':
+            products = products.order_by('name')
+        else:
+            products = products.order_by('name')
+
         product_data = []
         for p in products:
             product_data.append({
-                'id':          str(p.id),
-                'name':        p.name,
-                'price':       str(p.price),
-                'shop_name':   p.vendor.shop_name,
-                'shop_id':     str(p.vendor.id),
-                'town':        p.vendor.town,
+                'id':        str(p.id),
+                'name':      p.name,
+                'price':     str(p.price),
+                'shop_name': p.vendor.shop_name,
+                'shop_id':   str(p.vendor.id),
+                'town':      p.vendor.town,
+                'rating':    str(p.vendor.rating),
             })
 
         return Response({'shops': shop_data, 'products': product_data})
 
+
+# ─── WISHLIST ─────────────────────────────────────────────────────────────────
 
 class WishlistView(APIView):
     permission_classes = [IsAuthenticated]

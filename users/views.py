@@ -57,7 +57,7 @@ class ProfileView(APIView):
     def patch(self, request):
         if not request.user.is_authenticated:
             return Response({'error': 'Not authenticated'}, status=401)
-        user = request.user
+        user           = request.user
         user.full_name = request.data.get('full_name', user.full_name)
         user.email     = request.data.get('email', user.email)
         user.town      = request.data.get('town', user.town)
@@ -66,6 +66,64 @@ class ProfileView(APIView):
             'message': 'Profile updated successfully',
             'user':    UserSerializer(user).data,
         })
+
+
+# ─── PROFILE PHOTO UPLOAD ─────────────────────────────────────────────────────
+
+class UploadProfilePhotoView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if 'photo' not in request.FILES:
+            return Response({'error': 'No photo provided'}, status=400)
+
+        user  = request.user
+        photo = request.FILES['photo']
+
+        # Validate file type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+        if photo.content_type not in allowed_types:
+            return Response({'error': 'Only JPEG, PNG and WEBP images allowed'}, status=400)
+
+        # Validate file size (max 5MB)
+        if photo.size > 5 * 1024 * 1024:
+            return Response({'error': 'Image size must be under 5MB'}, status=400)
+
+        # Delete old photo if exists
+        if user.profile_photo:
+            try:
+                import os
+                if os.path.isfile(user.profile_photo.path):
+                    os.remove(user.profile_photo.path)
+            except Exception:
+                pass
+
+        # Save new photo
+        user.profile_photo = photo
+        user.save()
+
+        # Build full photo URL
+        photo_url = request.build_absolute_uri(user.profile_photo.url)
+
+        return Response({
+            'message':   'Profile photo updated successfully!',
+            'photo_url': photo_url,
+            'user':      UserSerializer(user).data,
+        })
+
+    def delete(self, request):
+        user = request.user
+        if user.profile_photo:
+            try:
+                import os
+                if os.path.isfile(user.profile_photo.path):
+                    os.remove(user.profile_photo.path)
+            except Exception:
+                pass
+            user.profile_photo = None
+            user.save()
+            return Response({'message': 'Profile photo removed'})
+        return Response({'message': 'No photo to remove'})
 
 
 # ─── ADDRESS VIEWS ────────────────────────────────────────────────────────────

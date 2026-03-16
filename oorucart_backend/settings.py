@@ -125,3 +125,11 @@ SIMPLE_JWT = {
 
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
+# MEDIA FILES
+import os
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# MEDIA FILES
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
