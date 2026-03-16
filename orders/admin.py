@@ -34,3 +34,10 @@ class CartAdmin(admin.ModelAdmin):
     list_display  = ['buyer', 'product', 'vendor', 'quantity', 'added_at']
     list_filter   = ['vendor']
     search_fields = ['buyer__full_name', 'product__name']
+from .models import Coupon
+
+@admin.register(Coupon)
+class CouponAdmin(admin.ModelAdmin):
+    list_display  = ['code', 'discount_type', 'discount_value', 'min_order', 'used_count', 'max_uses', 'valid_until', 'is_active']
+    list_editable = ['is_active']
+    search_fields = ['code']

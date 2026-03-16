@@ -4,7 +4,8 @@ from .views import (PlaceOrderView, BuyerOrdersView,
                     OrderDetailView, NotificationListView,
                     MarkNotificationReadView, SubmitReviewView,
                     get_cart, add_to_cart, update_cart_item,
-                    remove_from_cart, clear_cart)
+                    remove_from_cart, clear_cart,
+                    ValidateCouponView)
 
 urlpatterns = [
     # ─── ORDERS ───────────────────────────────────────────────────────────────
@@ -26,4 +27,7 @@ urlpatterns = [
     path('cart/update/<uuid:item_id>/',          update_cart_item,                   name='update-cart'),
     path('cart/remove/<uuid:item_id>/',          remove_from_cart,                   name='remove-from-cart'),
     path('cart/clear/',                          clear_cart,                         name='clear-cart'),
+
+    # ─── COUPON ───────────────────────────────────────────────────────────────
+    path('coupon/validate/',                     ValidateCouponView.as_view(),       name='validate-coupon'),
 ]

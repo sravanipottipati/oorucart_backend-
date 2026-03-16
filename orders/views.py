@@ -388,3 +388,47 @@ def clear_cart(request):
     return Response({
         'message': f'Cart cleared ({deleted_count} items removed)'
     })
+
+# ─── COUPON VIEWS ─────────────────────────────────────────────────────────────
+from django.utils.timezone import now as tz_now
+
+class ValidateCouponView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .models import Coupon
+        code         = request.data.get('code', '').upper().strip()
+        order_amount = float(request.data.get('order_amount', 0))
+
+        if not code:
+            return Response({'error': 'Coupon code required'}, status=400)
+
+        try:
+            coupon = Coupon.objects.get(
+                code=code,
+                is_active=True,
+                valid_from__lte=tz_now(),
+                valid_until__gte=tz_now(),
+            )
+        except Coupon.DoesNotExist:
+            return Response({'error': 'Invalid or expired coupon'}, status=400)
+
+        if coupon.used_count >= coupon.max_uses:
+            return Response({'error': 'Coupon usage limit reached'}, status=400)
+
+        if order_amount < float(coupon.min_order):
+            return Response({
+                'error': f'Minimum order amount is ₹{coupon.min_order}'
+            }, status=400)
+
+        if coupon.discount_type == 'percent':
+            discount = round(order_amount * float(coupon.discount_value) / 100, 2)
+        else:
+            discount = float(coupon.discount_value)
+
+        return Response({
+            'valid':    True,
+            'code':     coupon.code,
+            'discount': discount,
+            'message':  f'Coupon applied! You save ₹{discount}',
+        })
