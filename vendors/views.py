@@ -313,3 +313,64 @@ class WishlistView(APIView):
         else:
             wishlist.delete()
             return Response({'message': 'Removed from wishlist', 'wishlisted': False})
+
+# ─── PRODUCT VARIANT VIEWS ────────────────────────────────────────────────────
+from .models import ProductVariant
+from .serializers import AddVariantSerializer, ProductVariantSerializer
+
+class ProductVariantView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, product_id):
+        try:
+            product  = Product.objects.get(id=product_id)
+            variants = ProductVariant.objects.filter(product=product, is_available=True)
+            return Response({
+                'product_id':   str(product.id),
+                'product_name': product.name,
+                'base_price':   str(product.price),
+                'variants':     ProductVariantSerializer(variants, many=True).data
+            })
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=404)
+
+    def post(self, request, product_id):
+        try:
+            product = Product.objects.get(id=product_id, vendor=request.user.vendor)
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=404)
+        serializer = AddVariantSerializer(data=request.data)
+        if serializer.is_valid():
+            variant = serializer.save(product=product)
+            return Response({
+                'message': 'Variant added successfully',
+                'variant': ProductVariantSerializer(variant).data
+            }, status=201)
+        return Response(serializer.errors, status=400)
+
+
+class EditVariantView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, variant_id):
+        try:
+            variant = ProductVariant.objects.get(
+                id=variant_id, product__vendor=request.user.vendor
+            )
+        except ProductVariant.DoesNotExist:
+            return Response({'error': 'Variant not found'}, status=404)
+        serializer = AddVariantSerializer(variant, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({'message': 'Variant updated', 'variant': ProductVariantSerializer(variant).data})
+        return Response(serializer.errors, status=400)
+
+    def delete(self, request, variant_id):
+        try:
+            variant = ProductVariant.objects.get(
+                id=variant_id, product__vendor=request.user.vendor
+            )
+            variant.delete()
+            return Response({'message': 'Variant deleted'})
+        except ProductVariant.DoesNotExist:
+            return Response({'error': 'Variant not found'}, status=404)
