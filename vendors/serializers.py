@@ -1,25 +1,39 @@
 from rest_framework import serializers
-from .models import Vendor, Product
+from .models import Vendor, Product, ProductVariant
 import math
+
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Calculate distance in km between two GPS coordinates using Haversine formula"""
-    R = 6371  # Earth radius in km
+    R    = 6371
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat/2) ** 2 +
-         math.cos(math.radians(lat1)) *
-         math.cos(math.radians(lat2)) *
-         math.sin(dlon/2) ** 2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    a    = (math.sin(dlat/2) ** 2 +
+            math.cos(math.radians(lat1)) *
+            math.cos(math.radians(lat2)) *
+            math.sin(dlon/2) ** 2)
+    c    = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return round(R * c, 1)
 
+
+# ─── PRODUCT VARIANT SERIALIZER ───────────────────────────────────────────────
+class ProductVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ProductVariant
+        fields = ['id', 'name', 'price', 'stock_quantity', 'is_available']
+
+
+# ─── PRODUCT SERIALIZER ───────────────────────────────────────────────────────
 class ProductSerializer(serializers.ModelSerializer):
+    variants = ProductVariantSerializer(many=True, read_only=True)
+
     class Meta:
         model  = Product
-        fields = ['id', 'name', 'description', 'price',
-                  'category', 'is_available', 'created_at']
+        fields = ['id', 'name', 'description', 'price', 'category',
+                  'is_available', 'image', 'variants', 'created_at']
 
+
+# ─── VENDOR SERIALIZER ────────────────────────────────────────────────────────
 class VendorSerializer(serializers.ModelSerializer):
     products = ProductSerializer(many=True, read_only=True)
     distance = serializers.SerializerMethodField()
@@ -53,6 +67,8 @@ class VendorSerializer(serializers.ModelSerializer):
             print(f"Distance error: {e}")
             return None
 
+
+# ─── VENDOR REGISTER SERIALIZER ───────────────────────────────────────────────
 class VendorRegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Vendor
@@ -65,9 +81,13 @@ class VendorRegisterSerializer(serializers.ModelSerializer):
         user     = self.context['request'].user
         fee_map  = {
             'vegetables':  5,
+            'fruits':      5,
+            'dairy':       5,
             'bakery':      7,
+            'grocery':     7,
             'restaurant':  10,
             'supermarket': 7,
+            'other':       7,
         }
         category     = validated_data.get('category', 'other')
         platform_fee = fee_map.get(category, 7)
@@ -78,7 +98,16 @@ class VendorRegisterSerializer(serializers.ModelSerializer):
         )
         return vendor
 
+
+# ─── ADD PRODUCT SERIALIZER ───────────────────────────────────────────────────
 class AddProductSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Product
-        fields = ['name', 'description', 'price', 'category', 'is_available']
+        fields = ['name', 'description', 'price', 'category', 'is_available', 'image']
+
+
+# ─── ADD VARIANT SERIALIZER ───────────────────────────────────────────────────
+class AddVariantSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ProductVariant
+        fields = ['name', 'price', 'stock_quantity', 'is_available']
