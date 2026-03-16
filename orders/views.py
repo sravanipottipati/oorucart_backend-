@@ -2,7 +2,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from .models import Order, OrderItem, Notification
+from rest_framework.decorators import api_view, permission_classes
+from .models import Order, OrderItem, Notification, Cart
 from .serializers import PlaceOrderSerializer, OrderSerializer
 from vendors.models import Vendor, Product
 from wallet.models import WalletTransaction
@@ -34,7 +35,6 @@ class PlaceOrderView(APIView):
         serializer = PlaceOrderSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
         data = serializer.validated_data
         try:
             vendor = Vendor.objects.get(id=data['vendor_id'], status='approved')
@@ -43,7 +43,6 @@ class PlaceOrderView(APIView):
                 {'error': 'Shop not found or not approved'},
                 status=status.HTTP_404_NOT_FOUND
             )
-
         total_amount = 0
         order_items  = []
         for item in data['items']:
@@ -60,7 +59,6 @@ class PlaceOrderView(APIView):
                     {'error': f"Product {item['product_id']} not found"},
                     status=status.HTTP_404_NOT_FOUND
                 )
-
         order = Order.objects.create(
             buyer=request.user,
             vendor=vendor,
@@ -78,7 +76,6 @@ class PlaceOrderView(APIView):
                 quantity=item['quantity'],
                 price=item['price']
             )
-
         # Notify vendor about new order
         create_notification(
             user=vendor.user,
@@ -95,6 +92,8 @@ class PlaceOrderView(APIView):
             message=f'Your order from {vendor.shop_name} has been placed!',
             order=order,
         )
+        # ── Clear cart after successful order ──────────────────
+        Cart.objects.filter(buyer=request.user, vendor=vendor).delete()
 
         return Response({
             'message': 'Order placed successfully!',
@@ -132,10 +131,8 @@ class UpdateOrderStatusView(APIView):
             order = Order.objects.get(id=order_id)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found'}, status=404)
-
         new_status = request.data.get('status')
         user       = request.user
-
         # Vendor actions
         if user.user_type == 'vendor':
             try:
@@ -144,11 +141,9 @@ class UpdateOrderStatusView(APIView):
                 return Response({'error': 'Not a vendor'}, status=400)
             if order.vendor != vendor:
                 return Response({'error': 'This is not your order'}, status=403)
-
             allowed = ['accepted', 'rejected', 'preparing', 'dispatched', 'delivered']
             if new_status not in allowed:
                 return Response({'error': f'Invalid status. Choose from: {allowed}'}, status=400)
-
             # Record platform fee when accepted
             if new_status == 'accepted' and order.status == 'placed':
                 WalletTransaction.objects.create(
@@ -159,15 +154,13 @@ class UpdateOrderStatusView(APIView):
                     status='pending',
                     description=f'Platform fee for order {order.id}'
                 )
-
             order.status = new_status
             order.save()
-
             # Notify buyer of status change
             STATUS_MESSAGES = {
                 'accepted':   ('Order Accepted ✅',   f'{vendor.shop_name} accepted your order!'),
                 'rejected':   ('Order Rejected ❌',   f'{vendor.shop_name} rejected your order.'),
-                'preparing':  ('Being Prepared ��‍🍳',  f'{vendor.shop_name} is preparing your order.'),
+                'preparing':  ('Being Prepared 👨‍🍳',  f'{vendor.shop_name} is preparing your order.'),
                 'dispatched': ('Out for Delivery 🛵', 'Your order is on the way!'),
                 'delivered':  ('Order Delivered 🎉',  'Your order has been delivered. Enjoy!'),
             }
@@ -180,12 +173,10 @@ class UpdateOrderStatusView(APIView):
                     message=message,
                     order=order,
                 )
-
             return Response({
                 'message': f'Order status updated to {new_status}',
                 'order':   OrderSerializer(order).data
             })
-
         # Buyer cancel
         elif user.user_type == 'buyer':
             if order.buyer != user:
@@ -194,10 +185,8 @@ class UpdateOrderStatusView(APIView):
                 return Response({'error': 'Buyers can only cancel orders'}, status=400)
             if order.status not in ['placed']:
                 return Response({'error': 'Can only cancel orders that are just placed'}, status=400)
-
             order.status = 'cancelled'
             order.save()
-
             # Notify vendor of cancellation
             create_notification(
                 user=order.vendor.user,
@@ -206,9 +195,7 @@ class UpdateOrderStatusView(APIView):
                 message=f'Order #{str(order.id)[:8].upper()} was cancelled by customer.',
                 order=order,
             )
-
             return Response({'message': 'Order cancelled', 'order': OrderSerializer(order).data})
-
         return Response({'error': 'Unauthorized'}, status=403)
 
 
@@ -220,7 +207,6 @@ class OrderDetailView(APIView):
             order = Order.objects.get(id=order_id)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found'}, status=404)
-
         user = request.user
         if order.buyer != user and (
             not hasattr(user, 'vendor') or order.vendor != user.vendor
@@ -246,8 +232,8 @@ class NotificationListView(APIView):
             'created_at': n.created_at.isoformat(),
         } for n in notifications]
         return Response({
-            'count':    len(data),
-            'unread':   sum(1 for n in data if not n['is_read']),
+            'count':         len(data),
+            'unread':        sum(1 for n in data if not n['is_read']),
             'notifications': data,
         })
 
@@ -259,7 +245,6 @@ class MarkNotificationReadView(APIView):
         if notif_id:
             Notification.objects.filter(id=notif_id, user=request.user).update(is_read=True)
         else:
-            # Mark all read
             Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({'message': 'Marked as read'})
 
@@ -272,16 +257,12 @@ class SubmitReviewView(APIView):
             order = Order.objects.get(id=order_id, buyer=request.user)
         except Order.DoesNotExist:
             return Response({'error': 'Order not found'}, status=404)
-
         if order.status != 'delivered':
             return Response({'error': 'Can only review delivered orders'}, status=400)
-
         if hasattr(order, 'review'):
             return Response({'error': 'Already reviewed'}, status=400)
-
         rating  = request.data.get('rating', 5)
         comment = request.data.get('comment', '')
-
         from .models import Review
         review = Review.objects.create(
             order=order, buyer=request.user,
@@ -305,3 +286,105 @@ class SubmitReviewView(APIView):
             return Response({'has_review': False})
         except Order.DoesNotExist:
             return Response({'error': 'Order not found'}, status=404)
+
+
+# ─── CART VIEWS ───────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_cart(request):
+    cart_items = Cart.objects.filter(
+        buyer=request.user
+    ).select_related('product', 'vendor')
+
+    data = []
+    for item in cart_items:
+        data.append({
+            'id':            str(item.id),
+            'product_id':    str(item.product.id),
+            'product_name':  item.product.name,
+            'product_price': str(item.product.price),
+            'product_image': str(item.product.image) if item.product.image else '',
+            'vendor_id':     str(item.vendor.id),
+            'vendor_name':   item.vendor.shop_name,
+            'quantity':      item.quantity,
+            'subtotal':      str(item.subtotal),
+        })
+    total = sum(float(i['subtotal']) for i in data)
+    return Response({
+        'items': data,
+        'total': round(total, 2),
+        'count': len(data),
+    })
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_to_cart(request):
+    product_id = request.data.get('product_id')
+    vendor_id  = request.data.get('vendor_id')
+    quantity   = int(request.data.get('quantity', 1))
+
+    try:
+        product = Product.objects.get(id=product_id)
+        vendor  = Vendor.objects.get(id=vendor_id)
+    except Product.DoesNotExist:
+        return Response({'error': 'Product not found'}, status=404)
+    except Vendor.DoesNotExist:
+        return Response({'error': 'Vendor not found'}, status=404)
+
+    cart_item, created = Cart.objects.get_or_create(
+        buyer=request.user,
+        product=product,
+        defaults={'vendor': vendor, 'quantity': quantity}
+    )
+    if not created:
+        cart_item.quantity += quantity
+        cart_item.save()
+
+    return Response({
+        'message':  'Added to cart',
+        'quantity': cart_item.quantity,
+        'cart_id':  str(cart_item.id),
+    })
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_cart_item(request, item_id):
+    try:
+        item = Cart.objects.get(id=item_id, buyer=request.user)
+    except Cart.DoesNotExist:
+        return Response({'error': 'Cart item not found'}, status=404)
+
+    quantity = int(request.data.get('quantity', 1))
+    if quantity <= 0:
+        item.delete()
+        return Response({'message': 'Item removed from cart'})
+
+    item.quantity = quantity
+    item.save()
+    return Response({
+        'message':  'Cart updated',
+        'quantity': item.quantity,
+    })
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_from_cart(request, item_id):
+    try:
+        item = Cart.objects.get(id=item_id, buyer=request.user)
+        item.delete()
+        return Response({'message': 'Removed from cart'})
+    except Cart.DoesNotExist:
+        return Response({'error': 'Cart item not found'}, status=404)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def clear_cart(request):
+    deleted_count, _ = Cart.objects.filter(buyer=request.user).delete()
+    return Response({
+        'message': f'Cart cleared ({deleted_count} items removed)'
+    })

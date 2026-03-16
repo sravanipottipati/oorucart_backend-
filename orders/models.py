@@ -47,15 +47,15 @@ class OrderItem(models.Model):
 
 class Notification(models.Model):
     TYPE_CHOICES = (
-        ('order_placed',    'Order Placed'),
-        ('order_accepted',  'Order Accepted'),
-        ('order_rejected',  'Order Rejected'),
-        ('order_preparing', 'Order Preparing'),
-        ('order_dispatched','Order Dispatched'),
-        ('order_delivered', 'Order Delivered'),
-        ('order_cancelled', 'Order Cancelled'),
-        ('new_order',       'New Order'),
-        ('settlement',      'Settlement'),
+        ('order_placed',     'Order Placed'),
+        ('order_accepted',   'Order Accepted'),
+        ('order_rejected',   'Order Rejected'),
+        ('order_preparing',  'Order Preparing'),
+        ('order_dispatched', 'Order Dispatched'),
+        ('order_delivered',  'Order Delivered'),
+        ('order_cancelled',  'Order Cancelled'),
+        ('new_order',        'New Order'),
+        ('settlement',       'Settlement'),
     )
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
@@ -84,13 +84,34 @@ class Review(models.Model):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
-        # Update vendor average rating
         from django.db.models import Avg
-        avg = Review.objects.filter(vendor=self.vendor).aggregate(Avg('rating'))['rating__avg']
+        avg   = Review.objects.filter(vendor=self.vendor).aggregate(Avg('rating'))['rating__avg']
         count = Review.objects.filter(vendor=self.vendor).count()
-        self.vendor.rating = round(avg, 1)
+        self.vendor.rating       = round(avg, 1)
         self.vendor.total_reviews = count
         self.vendor.save()
 
     def __str__(self):
         return f"{self.buyer.full_name} → {self.vendor.shop_name} ({self.rating}★)"
+
+
+# ─── CART MODEL ───────────────────────────────────────────────────────────────
+class Cart(models.Model):
+    id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    buyer      = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cart_items')
+    product    = models.ForeignKey(Product, on_delete=models.CASCADE)
+    vendor     = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='cart_items')
+    quantity   = models.PositiveIntegerField(default=1)
+    added_at   = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('buyer', 'product')
+        ordering        = ['-added_at']
+
+    def __str__(self):
+        return f"{self.buyer.full_name} - {self.product.name} x{self.quantity}"
+
+    @property
+    def subtotal(self):
+        return self.product.price * self.quantity
