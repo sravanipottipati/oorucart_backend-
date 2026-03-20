@@ -2,7 +2,6 @@ from rest_framework import serializers
 from .models import Vendor, Product, ProductVariant
 import math
 
-
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Calculate distance in km between two GPS coordinates using Haversine formula"""
     R    = 6371
@@ -15,23 +14,26 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     c    = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return round(R * c, 1)
 
-
 # ─── PRODUCT VARIANT SERIALIZER ───────────────────────────────────────────────
 class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model  = ProductVariant
         fields = ['id', 'name', 'price', 'stock_quantity', 'is_available']
 
-
 # ─── PRODUCT SERIALIZER ───────────────────────────────────────────────────────
 class ProductSerializer(serializers.ModelSerializer):
-    variants = ProductVariantSerializer(many=True, read_only=True)
+    variants  = ProductVariantSerializer(many=True, read_only=True)
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model  = Product
         fields = ['id', 'name', 'description', 'price', 'category',
-                  'is_available', 'image', 'variants', 'created_at']
+                  'is_available', 'image', 'image_url', 'variants', 'created_at']
 
+    def get_image_url(self, obj):
+        if obj.image:
+            return obj.image.url   # full Cloudinary URL
+        return None
 
 # ─── VENDOR SERIALIZER ────────────────────────────────────────────────────────
 class VendorSerializer(serializers.ModelSerializer):
@@ -67,7 +69,6 @@ class VendorSerializer(serializers.ModelSerializer):
             print(f"Distance error: {e}")
             return None
 
-
 # ─── VENDOR REGISTER SERIALIZER ───────────────────────────────────────────────
 class VendorRegisterSerializer(serializers.ModelSerializer):
     class Meta:
@@ -98,13 +99,11 @@ class VendorRegisterSerializer(serializers.ModelSerializer):
         )
         return vendor
 
-
 # ─── ADD PRODUCT SERIALIZER ───────────────────────────────────────────────────
 class AddProductSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Product
         fields = ['name', 'description', 'price', 'category', 'is_available', 'image']
-
 
 # ─── ADD VARIANT SERIALIZER ───────────────────────────────────────────────────
 class AddVariantSerializer(serializers.ModelSerializer):

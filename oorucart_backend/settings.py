@@ -1,12 +1,11 @@
 from pathlib import Path
 from datetime import timedelta
+import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-y5bmqy7jyx5#-&%@4%bl13oui5e=p7v9*atsxgj7(*udl7o2b%'
-
 DEBUG = True
-
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
@@ -15,7 +14,9 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'cloudinary_storage',        # ← ADDED (must be before staticfiles)
     'django.contrib.staticfiles',
+    'cloudinary',                # ← ADDED
     # Third party
     'rest_framework',
     'rest_framework_simplejwt',
@@ -114,7 +115,7 @@ REST_FRAMEWORK = {
     'UNAUTHENTICATED_USER': None,
 }
 
-# JWT Settings — long lived tokens
+# JWT Settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(days=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=60),
@@ -125,11 +126,27 @@ SIMPLE_JWT = {
 
 # Custom User Model
 AUTH_USER_MODEL = 'users.User'
-# MEDIA FILES
-import os
+
+# Media Files (local fallback)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# MEDIA FILES
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# ─── Cloudinary Settings ──────────────────────────────────────────────────────
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'dxavm870k',
+    'API_KEY':    '993912218864416',      # ← PASTE YOUR KEY
+    'API_SECRET': '110YaWx20tK1I5pm8KPTCyx3AEw',   # ← PASTE YOUR SECRET
+}
+
+cloudinary.config(
+    cloud_name = 'dxavm870k',
+    api_key    = '993912218864416',       # ← PASTE YOUR KEY
+    api_secret = '110YaWx20tK1I5pm8KPTCyx3AEw',    # ← PASTE YOUR SECRET
+    secure     = True
+)
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
