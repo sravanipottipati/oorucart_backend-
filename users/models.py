@@ -1,7 +1,9 @@
 from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager
 import uuid
-
+import random
+from django.utils import timezone
+from datetime import timedelta
 
 class UserManager(BaseUserManager):
     def create_user(self, phone_number, password=None, **extra_fields):
@@ -16,7 +18,6 @@ class UserManager(BaseUserManager):
         extra_fields.setdefault('is_admin', True)
         extra_fields.setdefault('is_staff', True)
         return self.create_user(phone_number, password, **extra_fields)
-
 
 class User(AbstractBaseUser):
     USER_TYPES = (
@@ -77,3 +78,28 @@ class Address(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name} - {self.label} - {self.town}"
+
+
+# ─── PASSWORD RESET OTP ───────────────────────────────────────────────────────
+class PasswordResetOTP(models.Model):
+    id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user         = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reset_otps')
+    otp          = models.CharField(max_length=6)
+    is_used      = models.BooleanField(default=False)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    expires_at   = models.DateTimeField()
+
+    def save(self, *args, **kwargs):
+        if not self.expires_at:
+            self.expires_at = timezone.now() + timedelta(minutes=10)
+        super().save(*args, **kwargs)
+
+    def is_valid(self):
+        return not self.is_used and timezone.now() < self.expires_at
+
+    @staticmethod
+    def generate_otp():
+        return str(random.randint(100000, 999999))
+
+    def __str__(self):
+        return f"{self.user.phone_number} - OTP: {self.otp}"

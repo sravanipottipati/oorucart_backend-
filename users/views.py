@@ -4,8 +4,9 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
+from django.utils import timezone
 from .serializers import RegisterSerializer, UserSerializer
-from .models import User, Address
+from .models import User, Address, PasswordResetOTP
 
 
 def get_tokens_for_user(user):
@@ -80,16 +81,13 @@ class UploadProfilePhotoView(APIView):
         user  = request.user
         photo = request.FILES['photo']
 
-        # Validate file type
         allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
         if photo.content_type not in allowed_types:
             return Response({'error': 'Only JPEG, PNG and WEBP images allowed'}, status=400)
 
-        # Validate file size (max 5MB)
         if photo.size > 5 * 1024 * 1024:
             return Response({'error': 'Image size must be under 5MB'}, status=400)
 
-        # Delete old photo if exists
         if user.profile_photo:
             try:
                 import os
@@ -98,11 +96,9 @@ class UploadProfilePhotoView(APIView):
             except Exception:
                 pass
 
-        # Save new photo
         user.profile_photo = photo
         user.save()
 
-        # Build full photo URL
         photo_url = request.build_absolute_uri(user.profile_photo.url)
 
         return Response({
@@ -220,3 +216,112 @@ class SetDefaultAddressView(APIView):
             return Response({'message': 'Default address updated'})
         except Address.DoesNotExist:
             return Response({'error': 'Address not found'}, status=404)
+
+
+# ─── FORGOT PASSWORD ──────────────────────────────────────────────────────────
+
+class ForgotPasswordView(APIView):
+    def post(self, request):
+        phone_number = request.data.get('phone_number', '').strip()
+
+        if not phone_number:
+            return Response(
+                {'error': 'Phone number is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if user exists
+        try:
+            user = User.objects.get(phone_number=phone_number)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'No account found with this phone number'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Delete any existing unused OTPs for this user
+        PasswordResetOTP.objects.filter(user=user, is_used=False).delete()
+
+        # Generate new OTP
+        otp_code = PasswordResetOTP.generate_otp()
+
+        # Save OTP to database
+        from django.utils import timezone
+        from datetime import timedelta
+        PasswordResetOTP.objects.create(
+            user=user,
+            otp=otp_code,
+            expires_at=timezone.now() + timedelta(minutes=10),
+        )
+
+        # Print OTP in terminal for testing
+        # In production replace this with SMS service
+        print(f"\n[DEV] ================================")
+        print(f"[DEV] OTP for {phone_number}: {otp_code}")
+        print(f"[DEV] ================================\n")
+
+        return Response({
+            'message':      'OTP sent successfully',
+            'phone_number': phone_number,
+            'otp':          otp_code,  # Remove this in production
+        }, status=status.HTTP_200_OK)
+
+
+# ─── RESET PASSWORD ───────────────────────────────────────────────────────────
+
+class ResetPasswordView(APIView):
+    def post(self, request):
+        phone_number = request.data.get('phone_number', '').strip()
+        otp_code     = request.data.get('otp', '').strip()
+        new_password = request.data.get('new_password', '').strip()
+
+        # Validate fields
+        if not phone_number:
+            return Response({'error': 'Phone number is required'}, status=400)
+        if not otp_code:
+            return Response({'error': 'OTP is required'}, status=400)
+        if not new_password or len(new_password) < 6:
+            return Response({'error': 'Password must be at least 6 characters'}, status=400)
+
+        # Check user exists
+        try:
+            user = User.objects.get(phone_number=phone_number)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'No account found with this phone number'},
+                status=404
+            )
+
+        # Check OTP exists and is valid
+        try:
+            otp_record = PasswordResetOTP.objects.filter(
+                user=user,
+                otp=otp_code,
+                is_used=False
+            ).latest('created_at')
+        except PasswordResetOTP.DoesNotExist:
+            return Response(
+                {'error': 'Invalid OTP. Please request a new one.'},
+                status=400
+            )
+
+        # Check OTP is not expired
+        if not otp_record.is_valid():
+            return Response(
+                {'error': 'OTP has expired. Please request a new one.'},
+                status=400
+            )
+
+        # Reset password
+        user.set_password(new_password)
+        user.save()
+
+        # Mark OTP as used
+        otp_record.is_used = True
+        otp_record.save()
+
+        print(f"\n[DEV] Password reset successful for {phone_number}\n")
+
+        return Response({
+            'message': 'Password reset successful. Please login with your new password.'
+        }, status=status.HTTP_200_OK)
