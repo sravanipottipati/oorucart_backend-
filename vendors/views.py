@@ -35,6 +35,7 @@ class VendorRegisterView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# ─── NEARBY SHOPS — WITH BUYER RADIUS + VENDOR DELIVERY RADIUS ───────────────
 class NearbyShopsView(APIView):
     permission_classes = [AllowAny]
 
@@ -43,6 +44,14 @@ class NearbyShopsView(APIView):
         category  = request.query_params.get('category', '')
         buyer_lat = request.query_params.get('lat', None)
         buyer_lng = request.query_params.get('lng', None)
+
+        # ── Buyer search radius — default 10 km, max 50 km ───────────────────
+        try:
+            buyer_radius = float(request.query_params.get('radius', 10.0))
+            if buyer_radius > 50: buyer_radius = 50.0
+            if buyer_radius < 1:  buyer_radius = 1.0
+        except (ValueError, TypeError):
+            buyer_radius = 10.0
 
         shops = Vendor.objects.filter(status='approved', is_open=True)
         if town:
@@ -57,9 +66,9 @@ class NearbyShopsView(APIView):
                 blat = float(buyer_lat)
                 blng = float(buyer_lng)
 
-                def in_radius(v):
+                def get_distance(v):
                     if not v.latitude or not v.longitude:
-                        return True
+                        return 0.0
                     R    = 6371
                     dlat = math.radians(v.latitude - blat)
                     dlon = math.radians(v.longitude - blng)
@@ -67,10 +76,28 @@ class NearbyShopsView(APIView):
                             math.cos(math.radians(blat)) *
                             math.cos(math.radians(v.latitude)) *
                             math.sin(dlon/2)**2)
-                    dist = R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-                    return dist <= 5.0
+                    return round(R * 2 * math.atan2(math.sqrt(a), math.sqrt(1-a)), 1)
 
-                shops = [s for s in shops if in_radius(s)]
+                filtered = []
+                for s in shops:
+                    dist = get_distance(s)
+
+                    # Condition 1 — Shop within buyer's search radius
+                    within_buyer_radius = dist <= buyer_radius
+
+                    # Condition 2 — Buyer within vendor's delivery radius
+                    vendor_delivery_radius = s.delivery_radius if s.delivery_radius is not None else 5.0
+                    within_vendor_radius   = dist <= vendor_delivery_radius
+
+                    # Both must be true for shop to show
+                    if within_buyer_radius and within_vendor_radius:
+                        s._distance = dist
+                        filtered.append(s)
+
+                # Sort by distance — nearest first
+                filtered.sort(key=lambda s: s._distance)
+                shops = filtered
+
             except (ValueError, TypeError):
                 pass
 
@@ -79,8 +106,9 @@ class NearbyShopsView(APIView):
             context={'request': request}
         )
         return Response({
-            'count': len(shops),
-            'shops': serializer.data
+            'count':        len(shops),
+            'buyer_radius': buyer_radius,
+            'shops':        serializer.data
         })
 
 
@@ -198,7 +226,6 @@ class EditProductView(APIView):
 
 
 # ─── SEARCH WITH FILTERS + SORT ───────────────────────────────────────────────
-
 class SearchView(APIView):
     permission_classes = [AllowAny]
 
@@ -208,7 +235,6 @@ class SearchView(APIView):
         min_price = request.query_params.get('min_price', None)
         max_price = request.query_params.get('max_price', None)
         sort_by   = request.query_params.get('sort_by', 'relevant')
-        # sort_by: relevant | price_low | price_high | rating | name
 
         if not q:
             return Response({'shops': [], 'products': []})
@@ -235,7 +261,6 @@ class SearchView(APIView):
             products = products.filter(vendor__town__icontains=town)
         products = products.filter(name__icontains=q)
 
-        # Price filter
         if min_price:
             try:
                 products = products.filter(price__gte=float(min_price))
@@ -247,7 +272,6 @@ class SearchView(APIView):
             except ValueError:
                 pass
 
-        # Sort products
         if sort_by == 'price_low':
             products = products.order_by('price')
         elif sort_by == 'price_high':
@@ -275,7 +299,6 @@ class SearchView(APIView):
 
 
 # ─── WISHLIST ─────────────────────────────────────────────────────────────────
-
 class WishlistView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -313,6 +336,7 @@ class WishlistView(APIView):
         else:
             wishlist.delete()
             return Response({'message': 'Removed from wishlist', 'wishlisted': False})
+
 
 # ─── PRODUCT VARIANT VIEWS ────────────────────────────────────────────────────
 from .models import ProductVariant
@@ -362,7 +386,10 @@ class EditVariantView(APIView):
         serializer = AddVariantSerializer(variant, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response({'message': 'Variant updated', 'variant': ProductVariantSerializer(variant).data})
+            return Response({
+                'message': 'Variant updated',
+                'variant': ProductVariantSerializer(variant).data
+            })
         return Response(serializer.errors, status=400)
 
     def delete(self, request, variant_id):

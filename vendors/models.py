@@ -37,6 +37,9 @@ class Vendor(models.Model):
     longitude               = models.FloatField(null=True, blank=True)
     delivery_type           = models.CharField(max_length=10, choices=DELIVERY_CHOICES, default='both')
     estimated_delivery_time = models.IntegerField(default=30)
+    # ── NEW: Vendor delivery radius in km ─────────────────────────────────────
+    delivery_radius         = models.FloatField(default=5.0)
+    # ─────────────────────────────────────────────────────────────────────────
     platform_fee            = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     wallet_balance          = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     rating                  = models.FloatField(default=0.0)

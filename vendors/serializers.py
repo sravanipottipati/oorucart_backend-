@@ -32,7 +32,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_image_url(self, obj):
         if obj.image:
-            return obj.image.url   # full Cloudinary URL
+            return obj.image.url
         return None
 
 # ─── VENDOR SERIALIZER ────────────────────────────────────────────────────────
@@ -46,6 +46,7 @@ class VendorSerializer(serializers.ModelSerializer):
                   'phone_number', 'address', 'town',
                   'latitude', 'longitude',
                   'delivery_type', 'estimated_delivery_time',
+                  'delivery_radius',                          # ← NEW
                   'rating', 'total_reviews', 'platform_fee',
                   'is_open', 'status', 'products',
                   'distance', 'created_at']
@@ -76,7 +77,8 @@ class VendorRegisterSerializer(serializers.ModelSerializer):
         fields = ['shop_name', 'category', 'description',
                   'phone_number', 'address', 'town',
                   'latitude', 'longitude',
-                  'delivery_type', 'estimated_delivery_time']
+                  'delivery_type', 'estimated_delivery_time',
+                  'delivery_radius']                          # ← NEW
 
     def create(self, validated_data):
         user     = self.context['request'].user
