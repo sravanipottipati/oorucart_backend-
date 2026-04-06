@@ -4,6 +4,16 @@ from vendors.models import Vendor, Product
 import uuid
 
 
+# ── Readable order number like UNI-250401-7823 ────────────────────────────────
+def generate_order_number():
+    from datetime import datetime
+    import random, string
+    date    = datetime.now().strftime("%y%m%d")
+    letters = "".join(random.choices(string.ascii_uppercase, k=3))
+    num     = random.randint(100, 999)
+    return f"UNI-{date}-{letters}{num}"
+
+
 class Order(models.Model):
     STATUS_CHOICES = (
         ('placed',     'Placed'),
@@ -18,12 +28,15 @@ class Order(models.Model):
         ('cod',    'Cash on Delivery'),
         ('online', 'Online Payment'),
     )
+
     id               = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    order_number     = models.CharField(max_length=20, unique=True, default=generate_order_number, editable=False)
     buyer            = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
     vendor           = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='orders')
     status           = models.CharField(max_length=20, choices=STATUS_CHOICES, default='placed')
     total_amount     = models.DecimalField(max_digits=10, decimal_places=2)
     platform_fee     = models.DecimalField(max_digits=6, decimal_places=2, default=0)
+    delivery_fee     = models.DecimalField(max_digits=6, decimal_places=2, default=0)
     delivery_address = models.TextField()
     instructions     = models.TextField(blank=True, null=True)
     payment_mode     = models.CharField(max_length=10, choices=PAYMENT_CHOICES, default='cod')
@@ -31,7 +44,7 @@ class Order(models.Model):
     updated_at       = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Order {self.id} — {self.buyer.full_name} from {self.vendor.shop_name}"
+        return f"{self.order_number} — {self.buyer.full_name} from {self.vendor.shop_name}"
 
 
 class OrderItem(models.Model):
@@ -57,6 +70,7 @@ class Notification(models.Model):
         ('new_order',        'New Order'),
         ('settlement',       'Settlement'),
     )
+
     id         = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     type       = models.CharField(max_length=30, choices=TYPE_CHOICES)
@@ -87,7 +101,7 @@ class Review(models.Model):
         from django.db.models import Avg
         avg   = Review.objects.filter(vendor=self.vendor).aggregate(Avg('rating'))['rating__avg']
         count = Review.objects.filter(vendor=self.vendor).count()
-        self.vendor.rating       = round(avg, 1)
+        self.vendor.rating        = round(avg, 1)
         self.vendor.total_reviews = count
         self.vendor.save()
 
@@ -116,12 +130,14 @@ class Cart(models.Model):
     def subtotal(self):
         return self.product.price * self.quantity
 
+
 # ─── COUPON MODEL ─────────────────────────────────────────────────────────────
 class Coupon(models.Model):
     DISCOUNT_TYPES = (
         ('percent', 'Percentage'),
         ('flat',    'Flat Amount'),
     )
+
     code           = models.CharField(max_length=20, unique=True)
     discount_type  = models.CharField(max_length=10, choices=DISCOUNT_TYPES, default='percent')
     discount_value = models.DecimalField(max_digits=6, decimal_places=2)

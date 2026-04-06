@@ -305,6 +305,7 @@ def get_cart(request):
             'product_name':  item.product.name,
             'product_price': str(item.product.price),
             'product_image': str(item.product.image) if item.product.image else '',
+            'product_gst':   str(item.product.gst_percentage),
             'vendor_id':     str(item.vendor.id),
             'vendor_name':   item.vendor.shop_name,
             'quantity':      item.quantity,
@@ -384,7 +385,11 @@ def remove_from_cart(request, item_id):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def clear_cart(request):
-    deleted_count, _ = Cart.objects.filter(buyer=request.user).delete()
+    vendor_id = request.data.get('vendor_id') or request.query_params.get('vendor_id')
+    if vendor_id:
+        deleted_count, _ = Cart.objects.filter(buyer=request.user, vendor_id=vendor_id).delete()
+    else:
+        deleted_count, _ = Cart.objects.filter(buyer=request.user).delete()
     return Response({
         'message': f'Cart cleared ({deleted_count} items removed)'
     })

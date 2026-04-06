@@ -53,7 +53,7 @@ class NearbyShopsView(APIView):
         except (ValueError, TypeError):
             buyer_radius = 10.0
 
-        shops = Vendor.objects.filter(status='approved', is_open=True)
+        shops = Vendor.objects.filter(status='approved')
         if town:
             shops = shops.filter(town__icontains=town)
         if category:
@@ -154,7 +154,7 @@ class ShopProductsView(APIView):
     def get(self, request, vendor_id):
         try:
             vendor   = Vendor.objects.get(id=vendor_id)
-            products = Product.objects.filter(vendor=vendor, is_available=True)
+            products = Product.objects.filter(vendor=vendor)
             serializer = ProductSerializer(products, many=True)
             return Response({
                 'shop':     vendor.shop_name,
@@ -240,7 +240,7 @@ class SearchView(APIView):
             return Response({'shops': [], 'products': []})
 
         # ── Shops ──────────────────────────────────────────────────────────────
-        shops = Vendor.objects.filter(status='approved', is_open=True)
+        shops = Vendor.objects.filter(status='approved')
         if town:
             shops = shops.filter(town__icontains=town)
         shops = shops.filter(shop_name__icontains=q)
@@ -286,13 +286,17 @@ class SearchView(APIView):
         product_data = []
         for p in products:
             product_data.append({
-                'id':        str(p.id),
-                'name':      p.name,
-                'price':     str(p.price),
-                'shop_name': p.vendor.shop_name,
-                'shop_id':   str(p.vendor.id),
-                'town':      p.vendor.town,
-                'rating':    str(p.vendor.rating),
+                'id':                    str(p.id),
+                'name':                  p.name,
+                'price':                 str(p.price),
+                'category':              p.category,
+                'description':           p.description or '',
+                'image_url':             p.image.url if p.image else None,
+                'shop_name':             p.vendor.shop_name,
+                'shop_id':               str(p.vendor.id),
+                'town':                  p.vendor.town,
+                'rating':                str(p.vendor.rating),
+                'estimated_delivery_time': p.vendor.estimated_delivery_time or 30,
             })
 
         return Response({'shops': shop_data, 'products': product_data})
@@ -401,3 +405,38 @@ class EditVariantView(APIView):
             return Response({'message': 'Variant deleted'})
         except ProductVariant.DoesNotExist:
             return Response({'error': 'Variant not found'}, status=404)
+
+# ── Popular Products — for Home Screen ───────────────────────────────────────
+class PopularProductsView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        town     = request.query_params.get('town', '')
+        category = request.query_params.get('category', '')
+
+        # Get approved vendors in town
+        vendors = Vendor.objects.filter(status='approved')
+        if town:
+            vendors = vendors.filter(town__icontains=town)
+        if category:
+            vendors = vendors.filter(category=category)
+
+        # Get available products from these vendors
+        products = Product.objects.filter(
+            vendor__in=vendors,
+            is_available=True,
+        ).select_related('vendor').order_by('?')[:20]
+
+        data = []
+        for p in products:
+            data.append({
+                'id':          str(p.id),
+                'name':        p.name,
+                'price':       str(p.price),
+                'category':    p.category,
+                'image_url':   p.image_url if hasattr(p, 'image_url') else None,
+                'vendor_id':   str(p.vendor.id),
+                'shop_name':   p.vendor.shop_name,
+                'is_available':p.is_available,
+            })
+        return Response(data)

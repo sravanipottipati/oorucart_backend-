@@ -18,7 +18,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model  = ProductVariant
-        fields = ['id', 'name', 'price', 'stock_quantity', 'is_available']
+        fields = ['id', 'name', 'price', 'mrp', 'stock_quantity', 'is_available']
 
 # ─── PRODUCT SERIALIZER ───────────────────────────────────────────────────────
 class ProductSerializer(serializers.ModelSerializer):
@@ -27,7 +27,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = Product
-        fields = ['id', 'name', 'description', 'price', 'category',
+        fields = ['id', 'name', 'description', 'price', 'mrp', 'gst_percentage', 'category',
                   'is_available', 'image', 'image_url', 'variants', 'created_at']
 
     def get_image_url(self, obj):
@@ -105,7 +105,7 @@ class VendorRegisterSerializer(serializers.ModelSerializer):
 class AddProductSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Product
-        fields = ['name', 'description', 'price', 'category', 'is_available', 'image']
+        fields = ['name', 'description', 'price', 'mrp', 'gst_percentage', 'category', 'is_available', 'image']
 
 # ─── ADD VARIANT SERIALIZER ───────────────────────────────────────────────────
 class AddVariantSerializer(serializers.ModelSerializer):

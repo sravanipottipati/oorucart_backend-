@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import (VendorRegisterView, NearbyShopsView,
+from .views import (VendorRegisterView, NearbyShopsView, PopularProductsView,
                     ShopDetailView, AddProductView,
                     ShopProductsView, MyShopView, ToggleShopView,
                     EditProductView, SearchView, WishlistView,
@@ -25,6 +25,7 @@ urlpatterns = [
     path('variants/<uuid:variant_id>/',              EditVariantView.as_view(),     name='edit-variant'),
 
     # ─── SHOP ─────────────────────────────────────────────────────────────────
+    path('popular-products/',                        PopularProductsView.as_view(), name='popular-products'),
     path('<uuid:vendor_id>/',                        ShopDetailView.as_view(),      name='shop-detail'),
     path('<uuid:vendor_id>/products/',               ShopProductsView.as_view(),    name='shop-products'),
 ]

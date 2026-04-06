@@ -55,22 +55,49 @@ class Vendor(models.Model):
 
 class Product(models.Model):
     CATEGORY_CHOICES = (
-        ('vegetables', 'Vegetables'),
-        ('fruits',     'Fruits'),
-        ('dairy',      'Dairy'),
-        ('bakery',     'Bakery'),
-        ('snacks',     'Snacks'),
-        ('beverages',  'Beverages'),
-        ('food',       'Food'),
-        ('grocery',    'Grocery'),
-        ('other',      'Other'),
+        ('vegetables',    'Vegetables'),
+        ('fruits',        'Fruits'),
+        ('dairy',         'Dairy'),
+        ('bakery',        'Bakery'),
+        ('snacks',        'Snacks'),
+        ('beverages',     'Beverages'),
+        ('food',          'Food'),
+        ('grocery',       'Grocery'),
+        ('restaurant',    'Restaurant'),
+        ('supermarket',   'Supermarket'),
+        ('fast_food',     'Fast Food'),
+        ('chinese',       'Chinese'),
+        ('ice_cream',     'Ice Cream'),
+        ('fresh_leafies', 'Fresh Leafies'),
+        ('fresh_veggies', 'Fresh Veggies'),
+        ('staples',       'Staples'),
+        ('dal_pulses',    'Dal & Pulses'),
+        ('oils',          'Oils'),
+        ('spices',        'Spices'),
+        ('masala_powders','Masala Powders'),
+        ('sugar_salt',    'Sugar & Salt'),
+        ('dry_fruits',    'Dry Fruits'),
+        ('milk',          'Milk'),
+        ('curd',          'Curd'),
+        ('butter',        'Butter'),
+        ('paneer',        'Paneer'),
+        ('ghee',          'Ghee'),
+        ('eggs',          'Eggs'),
+        ('breakfast',     'Breakfast'),
+        ('lunch',         'Lunch'),
+        ('dinner',        'Dinner'),
+        ('main_course',   'Main Course'),
+        ('biryani',       'Biryani'),
+        ('other',         'Other'),
     )
     id           = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     vendor       = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='products')
     name         = models.CharField(max_length=200)
     description  = models.TextField(blank=True, null=True)
     price        = models.DecimalField(max_digits=8, decimal_places=2)
-    category     = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other')
+    mrp          = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True, help_text='Original price before discount')
+    gst_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text='GST % e.g. 5, 12, 18')
+    category     = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')
     is_available = models.BooleanField(default=True)
     image        = CloudinaryField('image', folder='shop2me/products', blank=True, null=True)
     created_at   = models.DateTimeField(auto_now_add=True)
@@ -93,7 +120,8 @@ class ProductVariant(models.Model):
                          related_name='variants')
     name           = models.CharField(max_length=100)
     price          = models.DecimalField(max_digits=8, decimal_places=2)
-    stock_quantity = models.PositiveIntegerField(default=0)
+    mrp            = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    stock_quantity = models.PositiveIntegerField(default=100)
     is_available   = models.BooleanField(default=True)
     created_at     = models.DateTimeField(auto_now_add=True)
 
