@@ -102,6 +102,12 @@ class Product(models.Model):
     image        = CloudinaryField('image', folder='shop2me/products', blank=True, null=True)
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
+    hsn_code       = models.CharField(max_length=20, blank=True, null=True)
+    subcategory    = models.CharField(max_length=100, blank=True, null=True)
+    is_returnable  = models.BooleanField(default=True)
+    is_cod         = models.BooleanField(default=True)
+    is_draft       = models.BooleanField(default=False)
+    delivery_time  = models.PositiveIntegerField(default=30)
 
     def __str__(self):
         return f"{self.name} - {self.vendor.shop_name}"
@@ -124,6 +130,7 @@ class ProductVariant(models.Model):
     stock_quantity = models.PositiveIntegerField(default=100)
     is_available   = models.BooleanField(default=True)
     created_at     = models.DateTimeField(auto_now_add=True)
+
 
     class Meta:
         ordering = ['price']
