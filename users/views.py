@@ -254,16 +254,28 @@ class ForgotPasswordView(APIView):
             expires_at=timezone.now() + timedelta(minutes=10),
         )
 
-        # Print OTP in terminal for testing
-        # In production replace this with SMS service
-        print(f"\n[DEV] ================================")
-        print(f"[DEV] OTP for {phone_number}: {otp_code}")
-        print(f"[DEV] ================================\n")
-
+        # Send OTP via Fast2SMS
+        import requests as req
+        import os
+        api_key = os.environ.get("FAST2SMS_API_KEY", "")
+        sms_sent = False
+        if api_key:
+            try:
+                resp = req.post(
+                    "https://www.fast2sms.com/dev/bulkV2",
+                    headers={"authorization": api_key},
+                    data={"route": "otp", "variables_values": otp_code, "flash": 0, "numbers": phone_number},
+                    timeout=10
+                )
+                result = resp.json()
+                sms_sent = result.get("return", False)
+                print(f"[SMS] Fast2SMS: {result}")
+            except Exception as e:
+                print(f"[SMS] Error: {e}")
+        print(f"[OTP] Phone: {phone_number} | OTP: {otp_code} | Sent: {sms_sent}")
         return Response({
-            'message':      'OTP sent successfully',
-            'phone_number': phone_number,
-            'otp':          otp_code,  # Remove this in production
+            "message": "OTP sent successfully",
+            "phone_number": phone_number,
         }, status=status.HTTP_200_OK)
 
 

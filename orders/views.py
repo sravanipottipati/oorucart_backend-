@@ -59,11 +59,39 @@ class PlaceOrderView(APIView):
                     {'error': f"Product {item['product_id']} not found"},
                     status=status.HTTP_404_NOT_FOUND
                 )
+        # ── Fee Structure ──────────────────────────────────────
+        # Platform fee
+        platform_fee = 10  # flat ₹10
+
+        # Delivery fee slab (default 2-4km = ₹35 until GPS integrated)
+        delivery_fee = 35
+
+        # Commission rate based on vendor category
+        category = vendor.category.lower() if vendor.category else ''
+        if category in ['vegetables', 'fruits']:
+            commission_rate = 3.0
+        elif category in ['restaurant', 'bakery', 'fast_food', 'chinese', 'ice_cream']:
+            commission_rate = 20.0
+        else:
+            commission_rate = 6.0  # default groceries/supermarket
+
+        subtotal         = float(total_amount)
+        commission_amount = round(subtotal * commission_rate / 100, 2)
+        gst_on_platform  = round((platform_fee + delivery_fee) * 18 / 100, 2)
+        tcs_amount       = round(subtotal * 1 / 100, 2)
+        grand_total      = round(subtotal + platform_fee + delivery_fee + gst_on_platform, 2)
+
         order = Order.objects.create(
             buyer=request.user,
             vendor=vendor,
-            total_amount=total_amount,
-            platform_fee=vendor.platform_fee,
+            subtotal=subtotal,
+            platform_fee=platform_fee,
+            delivery_fee=delivery_fee,
+            commission_rate=commission_rate,
+            commission_amount=commission_amount,
+            gst_on_platform=gst_on_platform,
+            tcs_amount=tcs_amount,
+            total_amount=grand_total,
             delivery_address=data['delivery_address'],
             instructions=data.get('instructions', ''),
             payment_mode=data.get('payment_mode', 'cod'),
