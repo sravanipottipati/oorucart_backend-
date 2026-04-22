@@ -4,8 +4,8 @@ import django
 import requests
 from io import BytesIO
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oorucart_backend.settings')
-sys.path.insert(0, '/Users/sravanipottipati/projects/oorucart_backend')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'univerin_backend.settings')
+sys.path.insert(0, '/Users/sravanipottipati/projects/univerin_backend')
 django.setup()
 
 import cloudinary.uploader

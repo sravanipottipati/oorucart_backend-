@@ -43,7 +43,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'oorucart_backend.urls'
+ROOT_URLCONF = 'univerin_backend.urls'
 
 TEMPLATES = [
     {
@@ -60,7 +60,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'oorucart_backend.wsgi.application'
+WSGI_APPLICATION = 'univerin_backend.wsgi.application'
 
 DATABASES = {
     'default': {

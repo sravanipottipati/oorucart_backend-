@@ -1,5 +1,5 @@
 import django, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'oorucart_backend.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'univerin_backend.settings')
 django.setup()
 
 from vendors.models import Vendor, Product, ProductVariant
