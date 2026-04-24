@@ -360,7 +360,7 @@ def admin_billing_excel(request):
 
     from django.db.models import Sum, Count
     vendor_summary = orders.values(
-        "vendor__shop_name", "vendor__category", "vendor__account_number"
+        "vendor__shop_name", "vendor__category", "vendor__shop_name"
     ).annotate(
         total_orders=Count("id"),
         gross=Sum("subtotal"),
@@ -383,7 +383,7 @@ def admin_billing_excel(request):
             f"Rs.{comm:.2f}",
             f"Rs.{tcs:.2f}",
             f"Rs.{net:.2f}",
-            v["vendor__account_number"] or "N/A",
+            v["vendor__shop_name"] or "N/A",
         ]
         aligns = ["left","left","center","right","right","right","right","left"]
         for col, (val, align) in enumerate(zip(row_data, aligns), 1):
