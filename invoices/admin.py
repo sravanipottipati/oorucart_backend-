@@ -1,3 +1,2 @@
 from django.contrib import admin
-
-# Register your models here.
+# Invoice admin handled in orders/admin.py

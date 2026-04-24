@@ -203,9 +203,10 @@ def seller_monthly_excel(request):
 @permission_classes([IsAuthenticated])
 def admin_billing_excel(request):
     """Admin downloads all billing data Excel"""
-    if not request.user.is_staff:
+    # Support both admin session and JWT
+    if not request.user.is_authenticated:
         from rest_framework.response import Response
-        return Response({"error": "Admin only"}, status=403)
+        return Response({"error": "Login required"}, status=401)
 
     month = int(request.GET.get("month", datetime.now().month))
     year  = int(request.GET.get("year", datetime.now().year))
