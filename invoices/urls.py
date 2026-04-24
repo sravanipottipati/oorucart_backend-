@@ -1,7 +1,10 @@
+from . import excel_views as views_excel
 from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('export/seller/', views_excel.seller_monthly_excel, name='seller-excel'),
+    path('export/admin/', views_excel.admin_billing_excel, name='admin-excel'),
     path('buyer/<uuid:order_id>/',           views.buyer_invoice,            name='buyer-invoice'),
     path('commission/<uuid:order_id>/',      views.commission_invoice,       name='commission-invoice'),
     path('seller/<uuid:order_id>/',          views.seller_dashboard_invoice, name='seller-invoice'),
