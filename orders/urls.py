@@ -1,4 +1,5 @@
 from django.urls import path
+from .payment_views import create_payment_order, verify_payment, payment_failed
 from .views import (PlaceOrderView, BuyerOrdersView,
                     VendorOrdersView, UpdateOrderStatusView,
                     OrderDetailView, NotificationListView,
@@ -30,4 +31,8 @@ urlpatterns = [
 
     # ─── COUPON ───────────────────────────────────────────────────────────────
     path('coupon/validate/',                     ValidateCouponView.as_view(),       name='validate-coupon'),
+    # ─── PAYMENT ──────────────────────────────────────────────────────────────
+    path('payment/create/',                      create_payment_order,               name='create-payment'),
+    path('payment/verify/',                      verify_payment,                     name='verify-payment'),
+    path('payment/failed/',                      payment_failed,                     name='payment-failed'),
 ]

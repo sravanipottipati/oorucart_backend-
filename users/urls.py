@@ -3,6 +3,7 @@ from .views import (RegisterView, LoginView, ProfileView,
                     AddressListView, AddressDetailView, SetDefaultAddressView,
                     UploadProfilePhotoView, ForgotPasswordView, ResetPasswordView)
 from rest_framework_simplejwt.views import TokenRefreshView
+from .admin_views import admin_stats
 
 urlpatterns = [
     # ─── AUTH ─────────────────────────────────────────────────────────────────
@@ -18,4 +19,5 @@ urlpatterns = [
     path('addresses/',                           AddressListView.as_view(),        name='addresses'),
     path('addresses/<uuid:address_id>/',         AddressDetailView.as_view(),      name='address-detail'),
     path('addresses/<uuid:address_id>/default/', SetDefaultAddressView.as_view(),  name='address-default'),
+    path('admin/stats/',                       admin_stats,                          name='admin-stats'),
 ]

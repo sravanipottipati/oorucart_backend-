@@ -8,7 +8,7 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-y5bmqy7jyx5#-&%@4%bl13oui5e=p7v9*atsxgj7(*udl7o2b%'
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
@@ -62,15 +62,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'univerin_backend.wsgi.application'
 
+import dj_database_url
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'oorucart',
-        'USER': 'oorucart_user',
-        'PASSWORD': 'oorucart123',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', 'postgresql://oorucart_user:oorucart123@localhost:5432/oorucart')
+    )
 }
 
 AUTH_PASSWORD_VALIDATORS = [

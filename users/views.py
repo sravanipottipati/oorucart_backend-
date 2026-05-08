@@ -254,22 +254,18 @@ class ForgotPasswordView(APIView):
             expires_at=timezone.now() + timedelta(minutes=10),
         )
 
-        # Send OTP via Fast2SMS
+        # Send OTP via 2Factor.in (SMS only)
         import requests as req
         import os
-        api_key = os.environ.get("FAST2SMS_API_KEY", "")
+        api_key = os.environ.get("TWOFACTOR_API_KEY", "")
         sms_sent = False
         if api_key:
             try:
-                resp = req.post(
-                    "https://www.fast2sms.com/dev/bulkV2",
-                    headers={"authorization": api_key},
-                    data={"route": "otp", "variables_values": otp_code, "flash": 0, "numbers": phone_number},
-                    timeout=10
-                )
+                url = f"https://2factor.in/API/V1/{api_key}/SMS/{phone_number}/{otp_code}/AUTOGEN"
+                resp = req.get(url, timeout=10)
                 result = resp.json()
-                sms_sent = result.get("return", False)
-                print(f"[SMS] Fast2SMS: {result}")
+                sms_sent = result.get("Status") == "Success"
+                print(f"[SMS] 2Factor: {result}")
             except Exception as e:
                 print(f"[SMS] Error: {e}")
         print(f"[OTP] Phone: {phone_number} | OTP: {otp_code} | Sent: {sms_sent}")

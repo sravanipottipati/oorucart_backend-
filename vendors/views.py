@@ -409,34 +409,57 @@ class EditVariantView(APIView):
 # ── Popular Products — for Home Screen ───────────────────────────────────────
 class PopularProductsView(APIView):
     permission_classes = []
-
     def get(self, request):
+        from orders.models import OrderItem
+        from django.db.models import Count, Case, When, IntegerField
+        from datetime import datetime, timedelta
+
         town     = request.query_params.get('town', '')
         category = request.query_params.get('category', '')
 
-        # Get approved vendors in town
         vendors = Vendor.objects.filter(status='approved')
         if town:
             vendors = vendors.filter(town__icontains=town)
         if category:
             vendors = vendors.filter(category=category)
 
-        # Get available products from these vendors
-        products = Product.objects.filter(
-            vendor__in=vendors,
-            is_available=True,
-        ).select_related('vendor').order_by('?')[:20]
+        last_30_days = datetime.now() - timedelta(days=30)
+        popular_ids = list(OrderItem.objects.filter(
+            order__vendor__in=vendors,
+            order__created_at__gte=last_30_days,
+            order__status='delivered',
+        ).values('product_id').annotate(
+            order_count=Count('id')
+        ).order_by('-order_count').values_list('product_id', flat=True)[:20])
+
+        products = []
+        if popular_ids:
+            preserved = Case(
+                *[When(id=pk, then=pos) for pos, pk in enumerate(popular_ids)],
+                output_field=IntegerField()
+            )
+            products = list(Product.objects.filter(
+                id__in=popular_ids,
+                is_available=True,
+            ).select_related('vendor').order_by(preserved))
+
+        if not products:
+            products = list(Product.objects.filter(
+                vendor__in=vendors,
+                is_available=True,
+            ).select_related('vendor').order_by('?')[:12])
 
         data = []
-        for p in products:
+        for i, p in enumerate(products):
             data.append({
-                'id':          str(p.id),
-                'name':        p.name,
-                'price':       str(p.price),
-                'category':    p.category,
-                'image_url':   p.image_url if hasattr(p, 'image_url') else None,
-                'vendor_id':   str(p.vendor.id),
-                'shop_name':   p.vendor.shop_name,
-                'is_available':p.is_available,
+                'id':           str(p.id),
+                'name':         p.name,
+                'price':        str(p.price),
+                'category':     p.category,
+                'image_url':    p.image.url if p.image else None,
+                'vendor_id':    str(p.vendor.id),
+                'shop_name':    p.vendor.shop_name,
+                'is_available': p.is_available,
+                'order_count':  i + 1,
             })
         return Response(data)

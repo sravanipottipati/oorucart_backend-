@@ -43,13 +43,33 @@ class WalletSummaryView(APIView):
             status='delivered'
         ).count()
 
+        # Total earnings = all delivered orders subtotal
+        from django.db.models import Sum as DSum
+        total_earnings = Order.objects.filter(
+            vendor=vendor,
+            status='delivered'
+        ).aggregate(total=DSum('subtotal'))['total'] or 0
+
+        pending_settlement = Order.objects.filter(
+            vendor=vendor,
+            status='delivered',
+            payment_status='pending'
+        ).aggregate(total=DSum('subtotal'))['total'] or 0
+
+        settled_amount = Order.objects.filter(
+            vendor=vendor,
+            status='delivered',
+            payment_status='paid'
+        ).aggregate(total=DSum('subtotal'))['total'] or 0
+
         return Response({
-            'shop_name': vendor.shop_name,
-            'platform_fee_per_order': vendor.platform_fee,
-            'pending_fees': pending_fees,
-            'settled_fees': settled_fees,
-            'total_orders_delivered': total_orders,
-            'message': f'You owe ₹{pending_fees} to Shop2me (pending settlement)'
+            'shop_name':          vendor.shop_name,
+            'total_earnings':     float(total_earnings),
+            'pending_settlement': float(pending_settlement),
+            'settled_amount':     float(settled_amount),
+            'total_orders':       total_orders,
+            'pending_fees':       float(pending_fees),
+            'settled_fees':       float(settled_fees),
         })
 
 

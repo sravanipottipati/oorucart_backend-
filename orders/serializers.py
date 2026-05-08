@@ -40,4 +40,4 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['id', 'order_number', 'buyer_name', 'shop_name', 'status', 'total_amount',
                   'platform_fee', 'delivery_fee', 'delivery_address', 'instructions',
-                  'payment_mode', 'items', 'created_at', 'updated_at']
+                  'payment_mode', 'gst_on_platform', 'subtotal', 'items', 'created_at', 'updated_at']

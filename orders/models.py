@@ -44,7 +44,10 @@ class Order(models.Model):
     subtotal         = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     delivery_address = models.TextField()
     instructions     = models.TextField(blank=True, null=True)
-    payment_mode     = models.CharField(max_length=10, choices=PAYMENT_CHOICES, default='cod')
+    payment_mode          = models.CharField(max_length=10, choices=PAYMENT_CHOICES, default='cod')
+    payment_status        = models.CharField(max_length=20, default='pending')
+    razorpay_order_id     = models.CharField(max_length=100, blank=True, null=True)
+    razorpay_payment_id   = models.CharField(max_length=100, blank=True, null=True)
     created_at       = models.DateTimeField(auto_now_add=True)
     updated_at       = models.DateTimeField(auto_now=True)
 
