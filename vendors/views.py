@@ -54,8 +54,9 @@ class NearbyShopsView(APIView):
             buyer_radius = 10.0
 
         shops = Vendor.objects.filter(status='approved')
-        if town:
-            shops = shops.filter(town__icontains=town)
+        # Town filter removed - show shops based on GPS radius only
+        # if town:
+        #     shops = shops.filter(town__icontains=town)
         if category:
             shops = shops.filter(category=category)
 
@@ -241,8 +242,9 @@ class SearchView(APIView):
 
         # ── Shops ──────────────────────────────────────────────────────────────
         shops = Vendor.objects.filter(status='approved')
-        if town:
-            shops = shops.filter(town__icontains=town)
+        # Town filter removed - show shops based on GPS radius only
+        # if town:
+        #     shops = shops.filter(town__icontains=town)
         shops = shops.filter(shop_name__icontains=q)
         if sort_by == 'rating':
             shops = shops.order_by('-rating')
