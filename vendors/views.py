@@ -182,6 +182,21 @@ class MyShopView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+    def patch(self, request):
+        try:
+            vendor = request.user.vendor
+        except Exception:
+            return Response({'error': 'You do not have a shop yet'}, status=404)
+        allowed_fields = ['shop_name', 'address', 'town', 'phone_number', 'description', 'delivery_radius', 'latitude', 'longitude']
+        for field in allowed_fields:
+            if field in request.data:
+                setattr(vendor, field, request.data[field])
+        vendor.save()
+        return Response({
+            'message': 'Shop updated successfully',
+            'vendor': VendorSerializer(vendor, context={'request': request}).data
+        })
+
 
 class ToggleShopView(APIView):
     permission_classes = [IsAuthenticated]
