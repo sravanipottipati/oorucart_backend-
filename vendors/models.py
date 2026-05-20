@@ -99,6 +99,7 @@ class Product(models.Model):
     gst_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text='GST % e.g. 5, 12, 18')
     category     = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other')
     is_available = models.BooleanField(default=True)
+    is_veg       = models.BooleanField(default=True)  # True=Veg, False=Non-veg
     image        = CloudinaryField('image', folder='shop2me/products', blank=True, null=True)
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)

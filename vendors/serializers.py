@@ -28,7 +28,7 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Product
         fields = ['id', 'name', 'description', 'price', 'mrp', 'gst_percentage', 'category',
-                  'is_available', 'image', 'image_url', 'variants', 'created_at',
+                  'is_available', 'is_veg', 'image', 'image_url', 'variants', 'created_at',
                   'hsn_code', 'subcategory', 'is_returnable', 'is_cod', 'is_draft', 'delivery_time']
 
     def get_image_url(self, obj):
@@ -106,7 +106,7 @@ class VendorRegisterSerializer(serializers.ModelSerializer):
 class AddProductSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Product
-        fields = ['name', 'description', 'price', 'mrp', 'gst_percentage', 'category', 'is_available', 'image', 'hsn_code', 'subcategory', 'is_returnable', 'is_cod', 'is_draft', 'delivery_time']
+        fields = ['name', 'description', 'price', 'mrp', 'gst_percentage', 'category', 'is_available', 'is_veg', 'image', 'hsn_code', 'subcategory', 'is_returnable', 'is_cod', 'is_draft', 'delivery_time']
 
 # ─── ADD VARIANT SERIALIZER ───────────────────────────────────────────────────
 class AddVariantSerializer(serializers.ModelSerializer):
