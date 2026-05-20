@@ -225,6 +225,11 @@ class EditProductView(APIView):
         serializer = AddProductSerializer(product, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            # Update base price to lowest variant price if variants exist
+            min_price = ProductVariant.objects.filter(product=product).order_by('price').values_list('price', flat=True).first()
+            if min_price:
+                Product.objects.filter(id=product.id).update(price=min_price)
+                product.refresh_from_db()
             return Response({
                 'message': 'Product updated',
                 'product': ProductSerializer(product).data
