@@ -54,7 +54,9 @@ class NearbyShopsView(APIView):
             buyer_radius = 10.0
 
         shops = Vendor.objects.filter(status='approved')
-        if town:
+        # Only filter by town if no GPS — if GPS available, use radius instead
+        has_gps = request.query_params.get('lat') and request.query_params.get('lng')
+        if town and not has_gps:
             shops = shops.filter(town__icontains=town)
         if category:
             shops = shops.filter(category=category)
@@ -385,6 +387,10 @@ class ProductVariantView(APIView):
         serializer = AddVariantSerializer(data=request.data)
         if serializer.is_valid():
             variant = serializer.save(product=product)
+            # Update product base price to lowest variant price
+            min_price = ProductVariant.objects.filter(product=product).order_by('price').values_list('price', flat=True).first()
+            if min_price:
+                Product.objects.filter(id=product.id).update(price=min_price)
             return Response({
                 'message': 'Variant added successfully',
                 'variant': ProductVariantSerializer(variant).data
@@ -405,6 +411,11 @@ class EditVariantView(APIView):
         serializer = AddVariantSerializer(variant, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            # Update product base price to lowest variant price
+            product = variant.product
+            min_price = ProductVariant.objects.filter(product=product).order_by('price').values_list('price', flat=True).first()
+            if min_price:
+                Product.objects.filter(id=product.id).update(price=min_price)
             return Response({
                 'message': 'Variant updated',
                 'variant': ProductVariantSerializer(variant).data
