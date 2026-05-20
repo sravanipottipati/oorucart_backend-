@@ -54,7 +54,9 @@ class NearbyShopsView(APIView):
             buyer_radius = 10.0
 
         shops = Vendor.objects.filter(status='approved')
-        if town:
+        # Swiggy style — if GPS available, skip town filter
+        has_gps = request.query_params.get('lat') and request.query_params.get('lng')
+        if town and not has_gps:
             shops = shops.filter(town__icontains=town)
         if category:
             shops = shops.filter(category=category)
